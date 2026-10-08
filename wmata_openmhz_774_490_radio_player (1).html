@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMATA OpenMHZ 774 & 490 Radio Console</title>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Inter:wght@400;500;600;700;800&display=swap');
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #030712;
+            color: #f3f4f6;
+        }
+
+        .font-mono-num {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .glass-card {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .lcd-display {
+            font-family: 'JetBrains Mono', monospace;
+            background: radial-gradient(circle at center, #052e16 0%, #021a0d 100%);
+            border: 2px solid #059669;
+            box-shadow: inset 0 0 20px rgba(16, 185, 129, 0.25), 0 0 15px rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            text-shadow: 0 0 8px rgba(52, 211, 153, 0.6);
+        }
+
+        .lcd-display-774 {
+            font-family: 'JetBrains Mono', monospace;
+            background: radial-gradient(circle at center, #083344 0%, #031c26 100%);
+            border: 2px solid #0891b2;
+            box-shadow: inset 0 0 20px rgba(6, 182, 212, 0.25), 0 0 15px rgba(6, 182, 212, 0.15);
+            color: #38bdf8;
+            text-shadow: 0 0 8px rgba(56, 189, 248, 0.6);
+        }
+
+        .signal-bar {
+            transition: height 0.15s ease, background-color 0.15s ease;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.8); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 1); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+
+    <!-- Top Header Bar -->
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-50 px-4 py-3">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white text-lg shadow-lg shadow-cyan-950">
+                    <i class="fa-solid fa-tower-broadcast"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-extrabold text-base md:text-lg tracking-tight text-white">WMATA Radio Network</h1>
+                        <span class="bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">OpenMHZ Feed</span>
+                    </div>
+                    <p class="text-xs text-slate-400 font-mono">774 MHz P25 Phase II Trunking & 490 MHz UHF Operations</p>
+                </div>
+            </div>
+
+            <!-- Header Quick Stats & Controls -->
+            <div class="flex items-center flex-wrap gap-2 md:gap-3">
+                <div class="flex items-center gap-2 bg-slate-800/80 border border-slate-700/60 px-3 py-1.5 rounded-xl font-mono text-xs">
+                    <span id="global-status-dot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                    <span id="global-status-text" class="text-slate-300 font-bold">RECEIVER STANDBY</span>
+                </div>
+
+                <a href="https://openmhz.com/system/wmata" target="_blank" rel="noopener noreferrer" 
+                   class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all">
+                    <span>OpenMHZ Direct</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-cyan-400"></i>
+                </a>
+
+                <button onclick="openTowerListModal()" class="bg-indigo-950/60 hover:bg-indigo-900/70 text-indigo-300 border border-indigo-700/50 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all">
+                    <i class="fa-solid fa-tower-cell text-indigo-400"></i>
+                    <span>Towers (43 Sites)</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left / Center Radio Tuner & Playback Console (7 Cols) -->
+        <section class="lg:col-span-7 flex flex-col gap-5">
+            
+            <!-- LCD Tuner & Signal Display -->
+            <div id="lcd-container" class="lcd-display-774 rounded-3xl p-5 md:p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px]">
+                <!-- Background Frequency Scan Pattern -->
+                <div class="absolute -right-10 -bottom-10 opacity-5 text-white pointer-events-none text-9xl">
+                    <i class="fa-solid fa-radio"></i>
+                </div>
+
+                <div class="flex items-start justify-between relative z-10">
+                    <div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span id="band-indicator-badge" class="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-cyan-400 text-slate-950">774 MHz P25</span>
+                            <span id="tgid-display" class="font-mono text-xs opacity-80">TGID: 32784</span>
+                            <span id="modulation-badge" class="font-mono text-[10px] bg-slate-900/60 px-1.5 py-0.5 rounded border border-cyan-500/30">H-DQPSK P2</span>
+                        </div>
+                        <h2 id="channel-title" class="text-xl md:text-2xl font-extrabold tracking-tight text-white drop-shadow">ROCC Red Line Dispatch</h2>
+                        <p id="channel-subtitle" class="text-xs opacity-75 mt-0.5">Metrorail Rail Operations Control Center (Red Line Main)</p>
+                    </div>
+
+                    <!-- Signal Strength S-Meter -->
+                    <div class="text-right">
+                        <div class="text-[9px] uppercase tracking-wider font-bold opacity-70 mb-1">RF Signal RSSI</div>
+                        <div class="flex items-end gap-1 h-5 justify-end">
+                            <div class="w-1.5 h-1.5 bg-emerald-400 rounded-sm signal-bar"></div>
+                            <div class="w-1.5 h-2.5 bg-emerald-400 rounded-sm signal-bar"></div>
+                            <div class="w-1.5 h-3.5 bg-emerald-400 rounded-sm signal-bar"></div>
+                            <div class="w-1.5 h-4.5 bg-emerald-400 rounded-sm signal-bar"></div>
+                            <div class="w-1.5 h-5 bg-emerald-400 rounded-sm signal-bar"></div>
+                        </div>
+                        <div id="rssi-display" class="text-xs font-mono font-bold mt-1 text-emerald-400">-48 dBm (Optimal)</div>
+                    </div>
+                </div>
+
+                <!-- Big Center Frequency -->
+                <div class="my-4 text-center relative z-10">
+                    <div id="frequency-hero" class="text-4xl md:text-5xl font-black font-mono-num tracking-tight">
+                        774.18125 <span class="text-xl md:text-2xl font-semibold opacity-70">MHz</span>
+                    </div>
+                    <div id="call-meta-bar" class="text-[11px] font-mono opacity-80 mt-1 flex items-center justify-center gap-2">
+                        <span id="rx-state-tag" class="text-cyan-300 font-bold">READY</span>
+                        <span>•</span>
+                        <span id="call-timer-text">No Active Transmission</span>
+                    </div>
+                </div>
+
+                <!-- Spectrum / Audio Visualizer Canvas -->
+                <div class="relative z-10 w-full mt-2">
+                    <canvas id="audio-visualizer" height="42" class="w-full bg-slate-950/60 rounded-xl border border-cyan-500/20"></canvas>
+                </div>
+            </div>
+
+            <!-- Transport & Direct Controls -->
+            <div class="glass-card rounded-2xl p-4 md:p-5 space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <!-- Big Play / Stop Listen Button -->
+                        <button id="main-listen-btn" class="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 text-sm shadow-lg shadow-cyan-950 transition-all">
+                            <i class="fa-solid fa-play"></i>
+                            <span id="main-listen-text">Start Listening</span>
+                        </button>
+
+                        <!-- Dedicated ROCC Red Line Direct Hotkey -->
+                        <button id="direct-redline-btn" class="bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 text-sm shadow-lg shadow-red-950 transition-all">
+                            <span class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
+                            <span>Red Line ROCC</span>
+                        </button>
+                    </div>
+
+                    <!-- Audio Volume & Mute -->
+                    <div class="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-2 rounded-xl">
+                        <button id="mute-toggle-btn" class="text-slate-300 hover:text-white transition-colors">
+                            <i id="mute-icon" class="fa-solid fa-volume-high text-cyan-400"></i>
+                        </button>
+                        <input type="range" id="volume-slider" min="0" max="1" step="0.05" value="1.0" class="w-24 md:w-32 accent-cyan-400 bg-slate-700 h-1.5 rounded-lg cursor-pointer">
+                        <span id="volume-val" class="font-mono text-xs text-slate-400 w-8 text-right">100%</span>
+                    </div>
+                </div>
+
+                <!-- Band Selector Tabs -->
+                <div class="flex items-center gap-2 border-t border-slate-800 pt-3">
+                    <span class="text-xs text-slate-400 font-bold uppercase tracking-wider mr-1">Band:</span>
+                    <button onclick="setBandMode('774')" id="band-tab-774" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-cyan-600 text-white transition-all">
+                        774 MHz P25 Metrorail
+                    </button>
+                    <button onclick="setBandMode('490')" id="band-tab-490" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all">
+                        490 MHz UHF Metrobus & Ops
+                    </button>
+                    <button onclick="setBandMode('all')" id="band-tab-all" class="px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all">
+                        All Talkgroups
+                    </button>
+                </div>
+
+                <!-- Talkgroup Channel Preset Grid -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between text-xs text-slate-400">
+                        <span class="font-bold uppercase tracking-wider">Select Preset Channel:</span>
+                        <span id="preset-count-text" class="font-mono text-[11px] text-cyan-400">10 WMATA Channels</span>
+                    </div>
+                    <div id="channel-preset-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Now Playing Transmission Card -->
+            <div class="glass-card rounded-2xl p-4 space-y-2">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                        <h3 class="font-bold text-xs uppercase tracking-wider text-slate-300">Live Call Information</h3>
+                    </div>
+                    <span id="stream-engine-badge" class="font-mono text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                        OpenMHZ System: wmata
+                    </span>
+                </div>
+                <div id="now-playing-banner" class="bg-slate-900/90 rounded-xl p-3 border border-slate-800/80 font-mono text-xs space-y-1">
+                    <div class="text-slate-400 text-xs flex items-center gap-2">
+                        <i class="fa-solid fa-headphones text-cyan-400"></i>
+                        <span>Click <b class="text-white">Start Listening</b> or <b class="text-red-400">Red Line ROCC</b> to tune into live transmissions.</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Side: Real-Time Incoming Audio Feed & History (5 Cols) -->
+        <section class="lg:col-span-5 flex flex-col gap-5">
+            
+            <!-- Live Feed Queue & History Header -->
+            <div class="glass-card rounded-2xl p-4 flex-1 flex flex-col min-h-[500px]">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-xs">
+                            <i class="fa-solid fa-list-ul"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-sm text-white leading-tight">Live Calls Log</h3>
+                            <p class="text-[10px] text-slate-400 font-mono">Incoming P25 & UHF Dispatches</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="clearCallsHistory()" class="text-slate-400 hover:text-rose-400 text-xs px-2 py-1 rounded hover:bg-slate-800 transition-colors" title="Clear Call List">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                        <span id="call-count-badge" class="bg-slate-800 text-slate-300 font-mono text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-700">
+                            0 Calls
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Search / Filter Call Log -->
+                <div class="relative mb-3">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+                    <input type="text" id="call-filter-input" placeholder="Filter by line, talkgroup, or call ID..." 
+                           class="w-full bg-slate-900 border border-slate-700/70 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-all">
+                </div>
+
+                <!-- Call List Scroll Container -->
+                <div id="calls-list-container" class="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[520px]">
+                    <div id="call-list-empty" class="text-center py-12 text-slate-500 text-xs">
+                        <i class="fa-solid fa-satellite-dish text-3xl mb-2 opacity-40"></i>
+                        <p>No audio transmissions captured yet.</p>
+                        <p class="text-[10px] text-slate-600 mt-1">Incoming live calls will appear here in real time.</p>
+                    </div>
+                </div>
+
+                <!-- Bottom Feed Info -->
+                <div class="border-t border-slate-800 pt-3 mt-3 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                    <div class="flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span>Auto-poll: 4.5s</span>
+                    </div>
+                    <span id="last-sync-time">Sync: Standby</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Tower & Repeater Sites Modal -->
+    <div id="tower-list-modal" class="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-3xl p-5 text-xs shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
+                        <i class="fa-solid fa-tower-broadcast text-sm"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-extrabold text-white text-base">WMATA Radio Network Sites</h3>
+                        <p class="text-[10px] text-slate-400 font-mono">33 P25 774 MHz Sites & 10 UHF 490 MHz Towers</p>
+                    </div>
+                </div>
+                <button onclick="closeTowerListModal()" class="text-slate-400 hover:text-white p-2">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <!-- Tower Filter / Search -->
+            <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+                    <input type="text" id="tower-search-input" placeholder="Search tower name, address, or frequency band..." 
+                           class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="flex gap-1">
+                    <button onclick="filterTowerModalTab('all')" id="modal-tab-all" class="px-2.5 py-1 rounded-lg bg-cyan-600 text-white font-bold text-[11px]">All (43)</button>
+                    <button onclick="filterTowerModalTab('774')" id="modal-tab-774" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-bold text-[11px]">774 MHz (33)</button>
+                    <button onclick="filterTowerModalTab('490')" id="modal-tab-490" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-bold text-[11px]">490 MHz (10)</button>
+                </div>
+            </div>
+
+            <!-- Scrollable Tower Table -->
+            <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="tower-modal-list">
+                <!-- Dynamically injected -->
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-slate-800">
+                <button onclick="closeTowerListModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-4 py-1.5 rounded-xl transition-all">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Native Audio Engine -->
+    <audio id="native-radio-audio" preload="auto" playsinline></audio>
+
+    <script>
+        // Preset Talkgroups & Frequencies for WMATA
+        const CHANNELS = [
+            {
+                id: 'rocc_red',
+                tgid: 32784,
+                name: "ROCC Red Line Disp",
+                fullName: "ROCC Red Line Dispatch",
+                subTitle: "Metrorail Rail Operations Control Center (Shady Grove - Glenmont)",
+                freq: "774.18125 MHz",
+                band: "774",
+                color: "from-red-500/20 border-red-500/40 text-red-300",
+                badgeBg: "bg-red-500 text-white",
+                filterTag: "red"
+            },
+            {
+                id: 'rocc_bos',
+                tgid: 32816,
+                name: "ROCC Blue/Orange/Silver",
+                fullName: "ROCC Blue / Orange / Silver Dispatch",
+                subTitle: "Metrorail Core Trunk & Virginia/Maryland Corridors",
+                freq: "774.43125 MHz",
+                band: "774",
+                color: "from-blue-500/20 border-blue-500/40 text-blue-300",
+                badgeBg: "bg-blue-500 text-white",
+                filterTag: "blue"
+            },
+            {
+                id: 'rocc_gy',
+                tgid: 32848,
+                name: "ROCC Green/Yellow",
+                fullName: "ROCC Green / Yellow Line Dispatch",
+                subTitle: "Branch Ave to Greenbelt & Huntington to Mt Vernon",
+                freq: "774.68125 MHz",
+                band: "774",
+                color: "from-emerald-500/20 border-emerald-500/40 text-emerald-300",
+                badgeBg: "bg-emerald-500 text-white",
+                filterTag: "green"
+            },
+            {
+                id: 'rocc_silver',
+                tgid: 32880,
+                name: "ROCC Silver Line Disp",
+                fullName: "ROCC Silver Line Dulles Extension",
+                subTitle: "Dulles Airport & Ashburn Operations",
+                freq: "774.93125 MHz",
+                band: "774",
+                color: "from-slate-500/20 border-slate-500/40 text-slate-300",
+                badgeBg: "bg-slate-400 text-slate-950",
+                filterTag: "silver"
+            },
+            {
+                id: 'mtpd_disp',
+                tgid: 36016,
+                name: "MTPD Police Dispatch",
+                fullName: "Metro Transit Police Dispatch 1",
+                subTitle: "Law Enforcement & Rail Security Patrols",
+                freq: "774.05625 MHz",
+                band: "774",
+                color: "from-amber-500/20 border-amber-500/40 text-amber-300",
+                badgeBg: "bg-amber-500 text-slate-950",
+                filterTag: "police"
+            },
+            {
+                id: 'power_atc',
+                tgid: 37016,
+                name: "Power & ATC Signals",
+                fullName: "Substations & ATC Signaling",
+                subTitle: "Traction Power, Signals, Interlocking Control",
+                freq: "774.30625 MHz",
+                band: "774",
+                color: "from-cyan-500/20 border-cyan-500/40 text-cyan-300",
+                badgeBg: "bg-cyan-500 text-slate-950",
+                filterTag: "power"
+            },
+            {
+                id: 'bus_dc',
+                tgid: 35152,
+                name: "BOCC Metrobus DC Ops",
+                fullName: "BOCC Metrobus District Division",
+                subTitle: "Bus Operations Control Center - DC Routes",
+                freq: "490.30000 MHz",
+                band: "490",
+                color: "from-purple-500/20 border-purple-500/40 text-purple-300",
+                badgeBg: "bg-purple-500 text-white",
+                filterTag: "bus"
+            },
+            {
+                id: 'bus_md',
+                tgid: 35184,
+                name: "BOCC Metrobus MD Ops",
+                fullName: "BOCC Metrobus Maryland Division",
+                subTitle: "Montgomery & Prince George's County Service",
+                freq: "490.55000 MHz",
+                band: "490",
+                color: "from-purple-500/20 border-purple-500/40 text-purple-300",
+                badgeBg: "bg-purple-500 text-white",
+                filterTag: "bus"
+            },
+            {
+                id: 'bus_va',
+                tgid: 35216,
+                name: "BOCC Metrobus VA Ops",
+                fullName: "BOCC Metrobus Virginia Division",
+                subTitle: "Arlington, Alexandria & Fairfax Service",
+                freq: "490.80000 MHz",
+                band: "490",
+                color: "from-purple-500/20 border-purple-500/40 text-purple-300",
+                badgeBg: "bg-purple-500 text-white",
+                filterTag: "bus"
+            },
+            {
+                id: 'track_maint',
+                tgid: 37048,
+                name: "Track & Maintenance Crew",
+                fullName: "WMATA Track Crew & Wayside Maintenance",
+                subTitle: "Track Inspection, Third Rail Maintenance & Work Trains",
+                freq: "490.05000 MHz",
+                band: "490",
+                color: "from-orange-500/20 border-orange-500/40 text-orange-300",
+                badgeBg: "bg-orange-500 text-white",
+                filterTag: "maint"
+            }
+        ];
+
+        // 10 UHF 490MHz Sites
+        const TOWER_490_SITES = [
+            { name: "Woodbridge", address: "2311 Old Horner Road, Woodbridge, VA 22192", groundElev: "239 ft", towerHeight: "195 ft", band: "490 MHz", type: "Repeater Base" },
+            { name: "Hybla Valley", address: "4001 Augustine Street, Vernon, VA 22309", groundElev: "32 ft", towerHeight: "390 ft", band: "490 MHz", type: "High-Site Tower" },
+            { name: "Rockville", address: "101 Monroe Street, Rockville, MD 20850", groundElev: "419 ft", towerHeight: "235 ft", band: "490 MHz", type: "Repeater Base" },
+            { name: "Savage", address: "8900 Greenwood Place, Savage, MD 20763", groundElev: "134 ft", towerHeight: "400 ft", band: "490 MHz", type: "High-Site Tower" },
+            { name: "Silver Hill", address: "4700 Silver Hill Road, Suitland, MD 20746", groundElev: "285 ft", towerHeight: "319 ft", band: "490 MHz", type: "Repeater Base" },
+            { name: "Jericho", address: "9300 Lemons Bridge Road, Bowie, MD 20720", groundElev: "177 ft", towerHeight: "195 ft", band: "490 MHz", type: "Repeater Base" },
+            { name: "Georgia Avenue", address: "6001 Georgia Avenue, NW, Washington, DC 20011", groundElev: "298 ft", towerHeight: "757 ft", band: "490 MHz", type: "Master Broadcast Tower" },
+            { name: "Fairfax Station", address: "6199 Old Arrington Lane, Fairfax Station, VA 22309", groundElev: "433 ft", towerHeight: "390 ft", band: "490 MHz", type: "High-Site Tower" },
+            { name: "Reston", address: "11800 Sunrise Valley Drive, Reston, VA 20191", groundElev: "459 ft", towerHeight: "180 ft", band: "490 MHz", type: "Repeater Base" },
+            { name: "L'Enfant", address: "300 7th St SW 10th Floor, Washington, DC 20024", groundElev: "30 ft", towerHeight: "180 ft", band: "490 MHz", type: "HQ Hub" }
+        ];
+
+        // 33 P25 774MHz Sites
+        const TOWER_774_SITES = [
+            { name: "ACCOKEEK", address: "16111 Livingston Rd., Accokeek, MD 20607", height: "178 ft", rssi: "-47 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "ALEXANDRIA", address: "3201 Eisenhower Ave., Alexandria VA 22314", height: "107 ft", rssi: "-50 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "BRANCH AVENUE", address: "5700-AB Capital Gateway Dr., Suitland MD", height: "182 ft", rssi: "-40 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "BROOKEVILLE", address: "4301 Brookeville Rd., Brookeville, MD 20883", height: "214 ft", rssi: "-43 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "BURTONSVILLE", address: "16371 Old Columbia Pike, Burtonsville, MD", height: "214 ft", rssi: "-47 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "COBB", address: "4700 Cobb Rd., Lanham, MD 20785", height: "200 ft", rssi: "-46 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "DOC", address: "4820 Ritchie Marlboro Road, Upper Marlboro MD", height: "175 ft", rssi: "-55 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "DULLES", address: "44259 Old Ox Rd., Sterling, VA 20166", height: "219 ft", rssi: "-88 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "Dyson", address: "12701 Missouri Ave., Brandywine, MD 20613", height: "180 ft", rssi: "-88 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "FAIRFAX STATION", address: "6199 Old Arrington Ln., Fairfax Station, VA", height: "191 ft", rssi: "-50 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "GERMANTOWN", address: "20200 Observation Dr., Germantown, MD", height: "150 ft", rssi: "-51 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "GLENMONT", address: "12750 Layhill Rd., Silver Spring, MD", height: "214 ft", rssi: "Optimal", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "GREENBELT", address: "5801-A Sunnyside Ave, College Park MD", height: "214 ft", rssi: "-85 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "JERICHO PARK", address: "9510 Laurel Bowie Rd., Bowie, MD 20720", height: "127 ft", rssi: "-50 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "L'Enfant", address: "300 7th St NW, Washington DC 20024", height: "180 ft", rssi: "-91 dBm", band: "774 MHz", type: "Core Site" },
+            { name: "LORTON", address: "9850 Furnace Rd., Lorton, VA 22079", height: "172 ft", rssi: "-46 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "McCOART", address: "1 County Complex Ct., Woodbridge, VA", height: "195 ft", rssi: "-80 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "SAVAGE", address: "8900 Greenwood Pl., Savage, MD 20763", height: "110 ft", rssi: "-48 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "SHADY GROVE", address: "15903 Somerville Rd., Rockville MD", height: "208 ft", rssi: "Optimal", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "SKYLINE", address: "5107 Leesburg Pike., Falls Church, VA", height: "159 ft", rssi: "-123 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "SPRINGFIELD", address: "6851 Industrial Rd., Springfield, VA", height: "Ground", rssi: "-45 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "ST. ELIZABETH", address: "1500 Bruce Place SE, Washington, DC", height: "208 ft", rssi: "-85 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "SUNRISE VALLEY", address: "11800 Sunrise Valley Rd., Reston VA", height: "180 ft", rssi: "-65 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "TANTALLON", address: "11108 Fort Washington Rd., Fort Washington, MD", height: "156 ft", rssi: "-49 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "TENLEY", address: "4623 41st NW, Washington DC 20016", height: "150 ft", rssi: "-45 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "TYSONS", address: "1751 Pinnacle Dr., McLean, VA 22102", height: "107 ft", rssi: "-50 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "WEST OX", address: "4618 West Ox Rd., Fairfax, VA 22030", height: "172 ft", rssi: "-45 dBm", band: "774 MHz", type: "Simulcast Tower" },
+            { name: "CTF", address: "3500 Pennsy Drive, Landover, MD 20785", height: "N/A", rssi: "-55 dBm", band: "774 MHz", type: "Prime/CORE" },
+            { name: "MT. VERNON", address: "700 M Street NW, Washington, DC 20001", height: "N/A", rssi: "-90 dBm", band: "774 MHz", type: "Head End Link" },
+            { name: "MTV", address: "700 M Street NW, Washington, DC 20001", height: "N/A", rssi: "-90 dBm", band: "774 MHz", type: "Core Fiber Switch" },
+            { name: "RHODE ISLAND AVENUE", address: "919 Rhode Island Ave NE, Washington, DC", height: "N/A", rssi: "-85 dBm", band: "774 MHz", type: "Head End Node" },
+            { name: "ROSSLYN", address: "1700 North Moore St., Arlington, VA 22209", height: "N/A", rssi: "-80 dBm", band: "774 MHz", type: "Head End Node" },
+            { name: "SOCC", address: "3421 Pennsy Drive, Landover, MD 20875", height: "N/A", rssi: "-65 dBm", band: "774 MHz", type: "Dispatch Center" }
+        ];
+
+        // State
+        let currentChannel = CHANNELS[0];
+        let currentBandFilter = 'all';
+        let isListening = false;
+        let isMuted = false;
+        let audioEl = null;
+        let audioCtx = null;
+        let pollTimer = null;
+        let animFrameId = null;
+        let isAudioPlayingCall = false;
+
+        let callQueue = [];
+        let allCapturedCalls = [];
+        let playedCallIds = new Set();
+        let currentPlayingCall = null;
+    </script>
+
+    <!-- App Engine Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            audioEl = document.getElementById('native-radio-audio');
+            initVisualizer();
+            renderChannelPresets();
+            setupEventListeners();
+            selectChannel(CHANNELS[0]); // default ROCC Red Line
+        });
+
+        function renderChannelPresets() {
+            const container = document.getElementById('channel-preset-grid');
+            if (!container) return;
+
+            let filtered = CHANNELS;
+            if (currentBandFilter === '774') filtered = CHANNELS.filter(c => c.band === '774');
+            if (currentBandFilter === '490') filtered = CHANNELS.filter(c => c.band === '490');
+
+            const countEl = document.getElementById('preset-count-text');
+            if (countEl) countEl.innerText = `${filtered.length} Channels`;
+
+            container.innerHTML = '';
+            filtered.forEach(ch => {
+                const isSelected = (currentChannel.id === ch.id);
+                const btn = document.createElement('button');
+                btn.className = `p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2 ${
+                    isSelected 
+                        ? 'bg-slate-800/90 border-cyan-400 shadow-md ring-1 ring-cyan-500/50' 
+                        : 'bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/60'
+                }`;
+
+                btn.onclick = () => selectChannel(ch);
+
+                btn.innerHTML = `
+                    <div class="truncate">
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full ${ch.band === '774' ? 'bg-cyan-400' : 'bg-purple-400'}"></span>
+                            <span class="font-bold text-xs text-white truncate">${ch.name}</span>
+                        </div>
+                        <div class="text-[10px] text-slate-400 font-mono mt-0.5">${ch.freq}</div>
+                    </div>
+                    <span class="text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase shrink-0 ${ch.badgeBg}">
+                        ${ch.band}M
+                    </span>
+                `;
+
+                container.appendChild(btn);
+            });
+        }
+
+        function setBandMode(band) {
+            currentBandFilter = band;
+            ['774', '490', 'all'].forEach(b => {
+                const tab = document.getElementById(`band-tab-${b}`);
+                if (tab) {
+                    if (b === band) {
+                        tab.className = 'px-3 py-1.5 rounded-xl text-xs font-extrabold bg-cyan-600 text-white transition-all';
+                    } else {
+                        tab.className = 'px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all';
+                    }
+                }
+            });
+            renderChannelPresets();
+        }
+
+        function selectChannel(channel) {
+            currentChannel = channel;
+            
+            // Update LCD Theme and Labels
+            const lcd = document.getElementById('lcd-container');
+            const bandBadge = document.getElementById('band-indicator-badge');
+            const tgidDisp = document.getElementById('tgid-display');
+            const chTitle = document.getElementById('channel-title');
+            const chSub = document.getElementById('channel-subtitle');
+            const freqHero = document.getElementById('frequency-hero');
+            const modBadge = document.getElementById('modulation-badge');
+
+            if (channel.band === '490') {
+                if (lcd) {
+                    lcd.className = "lcd-display rounded-3xl p-5 md:p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px]";
+                }
+                if (bandBadge) {
+                    bandBadge.className = "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-400 text-slate-950";
+                    bandBadge.innerText = "490 MHz UHF";
+                }
+                if (modBadge) modBadge.innerText = "NBFM 12.5k";
+            } else {
+                if (lcd) {
+                    lcd.className = "lcd-display-774 rounded-3xl p-5 md:p-6 relative overflow-hidden flex flex-col justify-between min-h-[220px]";
+                }
+                if (bandBadge) {
+                    bandBadge.className = "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-cyan-400 text-slate-950";
+                    bandBadge.innerText = "774 MHz P25";
+                }
+                if (modBadge) modBadge.innerText = "H-DQPSK P2";
+            }
+
+            if (tgidDisp) tgidDisp.innerText = `TGID: ${channel.tgid}`;
+            if (chTitle) chTitle.innerText = channel.name;
+            if (chSub) chSub.innerText = channel.subTitle;
+            if (freqHero) {
+                const parts = channel.freq.split(' ');
+                freqHero.innerHTML = `${parts[0]} <span class="text-xl md:text-2xl font-semibold opacity-70">${parts[1] || 'MHz'}</span>`;
+            }
+
+            renderChannelPresets();
+
+            if (isListening) {
+                callQueue = [];
+                fetchOpenMhzCalls();
+            }
+        }
+
+        function setupEventListeners() {
+            const listenBtn = document.getElementById('main-listen-btn');
+            const redLineBtn = document.getElementById('direct-redline-btn');
+            const muteBtn = document.getElementById('mute-toggle-btn');
+            const volSlider = document.getElementById('volume-slider');
+            const callFilterInput = document.getElementById('call-filter-input');
+
+            if (listenBtn) {
+                listenBtn.addEventListener('click', toggleListening);
+            }
+
+            if (redLineBtn) {
+                redLineBtn.addEventListener('click', () => {
+                    const redChannel = CHANNELS.find(c => c.id === 'rocc_red');
+                    if (redChannel) selectChannel(redChannel);
+                    if (!isListening) startListening();
+                });
+            }
+
+            if (muteBtn) {
+                muteBtn.addEventListener('click', toggleMute);
+            }
+
+            if (volSlider) {
+                volSlider.addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
+                    if (audioEl) audioEl.volume = isMuted ? 0 : val;
+                    const txt = document.getElementById('volume-val');
+                    if (txt) txt.innerText = `${Math.round(val * 100)}%`;
+                });
+            }
+
+            if (callFilterInput) {
+                callFilterInput.addEventListener('input', renderCallList);
+            }
+
+            if (audioEl) {
+                audioEl.addEventListener('ended', () => {
+                    isAudioPlayingCall = false;
+                    setTimeout(playNextQueuedCall, 350);
+                });
+                audioEl.addEventListener('error', () => {
+                    isAudioPlayingCall = false;
+                    setTimeout(playNextQueuedCall, 500);
+                });
+            }
+        }
+
+        function toggleListening() {
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+
+        function startListening() {
+            isListening = true;
+            try {
+                if (!audioCtx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    audioCtx = new AudioContext();
+                }
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+            } catch (e) {}
+
+            const listenBtn = document.getElementById('main-listen-btn');
+            const listenText = document.getElementById('main-listen-text');
+            const globalDot = document.getElementById('global-status-dot');
+            const globalText = document.getElementById('global-status-text');
+            const rxTag = document.getElementById('rx-state-tag');
+
+            if (listenBtn) {
+                listenBtn.className = "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 text-sm transition-all";
+            }
+            if (listenText) listenText.innerText = "Stop Receiver";
+            if (globalDot) globalDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping";
+            if (globalText) globalText.innerText = "LIVE RX MONITORING";
+            if (rxTag) rxTag.innerText = "SCANNING";
+
+            fetchOpenMhzCalls();
+            pollTimer = setInterval(fetchOpenMhzCalls, 4500);
+        }
+
+        function stopListening() {
+            isListening = false;
+            if (pollTimer) clearInterval(pollTimer);
+            if (audioEl) audioEl.pause();
+            isAudioPlayingCall = false;
+
+            const listenBtn = document.getElementById('main-listen-btn');
+            const listenText = document.getElementById('main-listen-text');
+            const globalDot = document.getElementById('global-status-dot');
+            const globalText = document.getElementById('global-status-text');
+            const rxTag = document.getElementById('rx-state-tag');
+            const timerText = document.getElementById('call-timer-text');
+
+            if (listenBtn) {
+                listenBtn.className = "bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold px-6 py-2.5 rounded-xl flex items-center gap-2 text-sm shadow-lg shadow-cyan-950 transition-all";
+            }
+            if (listenText) listenText.innerText = "Start Listening";
+            if (globalDot) globalDot.className = "w-2.5 h-2.5 rounded-full bg-slate-500";
+            if (globalText) globalText.innerText = "RECEIVER STANDBY";
+            if (rxTag) rxTag.innerText = "STANDBY";
+            if (timerText) timerText.innerText = "Receiver Stopped";
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            const icon = document.getElementById('mute-icon');
+            const volSlider = document.getElementById('volume-slider');
+            const volVal = parseFloat(volSlider ? volSlider.value : 1.0);
+
+            if (isMuted) {
+                if (icon) icon.className = "fa-solid fa-volume-xmark text-red-400";
+                if (audioEl) audioEl.volume = 0;
+            } else {
+                if (icon) icon.className = "fa-solid fa-volume-high text-cyan-400";
+                if (audioEl) audioEl.volume = volVal;
+            }
+        }
+
+        async function fetchOpenMhzCalls() {
+            if (!isListening) return;
+
+            const syncEl = document.getElementById('last-sync-time');
+            if (syncEl) syncEl.innerText = `Sync: ${new Date().toLocaleTimeString()}`;
+
+            const proxyEndpoints = [
+                `https://api.openmhz.com/wmata/calls`,
+                `https://api.allorigins.win/raw?url=` + encodeURIComponent(`https://api.openmhz.com/wmata/calls`),
+                `https://corsproxy.io/?url=` + encodeURIComponent(`https://api.openmhz.com/wmata/calls`)
+            ];
+
+            let rawCalls = null;
+            for (const url of proxyEndpoints) {
+                try {
+                    const res = await fetch(url, { cache: "no-store" });
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json && json.calls && json.calls.length > 0) {
+                            rawCalls = json.calls;
+                            break;
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            if (!rawCalls || rawCalls.length === 0) return;
+
+            // Process and store all calls into history
+            rawCalls.forEach(call => {
+                if (!call._id) return;
+                
+                // Talkgroup mapping
+                const tgNum = call.talkgroupNum;
+                const matchedPreset = CHANNELS.find(ch => ch.tgid === tgNum) || null;
+                const talkgroupDesc = call.talkgroupDescription || (matchedPreset ? matchedPreset.name : `TGID ${tgNum}`);
+                const freqFormatted = call.freq ? (call.freq > 1000000 ? (call.freq / 1000000).toFixed(5) + " MHz" : parseFloat(call.freq).toFixed(5) + " MHz") : (matchedPreset ? matchedPreset.freq : "774.18125 MHz");
+
+                const enhancedCall = {
+                    ...call,
+                    formattedFreq: freqFormatted,
+                    talkgroupName: talkgroupDesc,
+                    matchedChannel: matchedPreset,
+                    timeString: call.time ? new Date(call.time).toLocaleTimeString() : new Date().toLocaleTimeString()
+                };
+
+                const existingIndex = allCapturedCalls.findIndex(c => c._id === call._id);
+                if (existingIndex === -1) {
+                    allCapturedCalls.unshift(enhancedCall);
+                }
+
+                // Check if this matches currently tuned channel filter
+                const matchesCurrentChannel = doesCallMatchChannel(call, currentChannel);
+                if (matchesCurrentChannel && !playedCallIds.has(call._id) && call.url) {
+                    callQueue.push(enhancedCall);
+                    playedCallIds.add(call._id);
+                }
+            });
+
+            if (allCapturedCalls.length > 80) allCapturedCalls = allCapturedCalls.slice(0, 80);
+
+            renderCallList();
+
+            if (!isAudioPlayingCall && callQueue.length > 0) {
+                playNextQueuedCall();
+            }
+        }
+
+        function doesCallMatchChannel(call, channel) {
+            if (!channel) return true;
+            if (call.talkgroupNum === channel.tgid) return true;
+            const desc = (call.talkgroupDescription || '').toLowerCase();
+            return desc.includes(channel.filterTag);
+        }
+
+        function playNextQueuedCall() {
+            if (!isListening || callQueue.length === 0) {
+                isAudioPlayingCall = false;
+                const rxTag = document.getElementById('rx-state-tag');
+                if (rxTag && isListening) rxTag.innerText = "STANDBY";
+                return;
+            }
+
+            const call = callQueue.shift();
+            playSpecificCall(call);
+        }
+
+        function playSpecificCall(call) {
+            currentPlayingCall = call;
+            isAudioPlayingCall = true;
+
+            const rxTag = document.getElementById('rx-state-tag');
+            const timerText = document.getElementById('call-timer-text');
+            const nowBanner = document.getElementById('now-playing-banner');
+
+            if (rxTag) rxTag.innerText = "ACTIVE RX";
+            if (timerText) timerText.innerText = `Streaming #${call._id.slice(-5)} (${call.len || 4}s)`;
+
+            if (nowBanner) {
+                nowBanner.innerHTML = `
+                    <div class="flex items-center justify-between text-xs mb-1">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <b class="text-white">${call.talkgroupName}</b>
+                            <span class="text-cyan-400 font-mono text-[11px]">${call.formattedFreq}</span>
+                        </div>
+                        <span class="text-slate-400 text-[10px]">${call.timeString}</span>
+                    </div>
+                    <div class="text-[11px] text-slate-300 flex items-center justify-between">
+                        <span>Audio Len: <b>${call.len || '4.0'}s</b></span>
+                        <span class="text-slate-400">Call ID: ${call._id}</span>
+                    </div>
+                `;
+            }
+
+            if (audioEl && call.url) {
+                audioEl.src = call.url;
+                const volSlider = document.getElementById('volume-slider');
+                audioEl.volume = isMuted ? 0 : parseFloat(volSlider ? volSlider.value : 1.0);
+
+                const playPromise = audioEl.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(e => {
+                        console.debug("Audio play defer:", e);
+                        isAudioPlayingCall = false;
+                        setTimeout(playNextQueuedCall, 800);
+                    });
+                }
+            }
+        }
+
+        function renderCallList() {
+            const container = document.getElementById('calls-list-container');
+            const filterInput = document.getElementById('call-filter-input');
+            const badge = document.getElementById('call-count-badge');
+            if (!container) return;
+
+            const filterText = filterInput ? filterInput.value.toLowerCase() : '';
+            const filtered = allCapturedCalls.filter(c => {
+                if (!filterText) return true;
+                return (
+                    (c.talkgroupName && c.talkgroupName.toLowerCase().includes(filterText)) ||
+                    (c._id && c._id.toLowerCase().includes(filterText)) ||
+                    (c.formattedFreq && c.formattedFreq.toLowerCase().includes(filterText)) ||
+                    (c.talkgroupNum && c.talkgroupNum.toString().includes(filterText))
+                );
+            });
+
+            if (badge) badge.innerText = `${filtered.length} Calls`;
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 text-slate-500 text-xs">
+                        <i class="fa-solid fa-satellite-dish text-3xl mb-2 opacity-40"></i>
+                        <p>No matching transmissions in log.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '';
+            filtered.forEach(call => {
+                const isPlaying = (currentPlayingCall && currentPlayingCall._id === call._id && isAudioPlayingCall);
+                const item = document.createElement('div');
+                item.className = `p-2.5 rounded-xl border text-xs font-mono transition-all flex items-center justify-between gap-3 ${
+                    isPlaying 
+                        ? 'bg-cyan-950/40 border-cyan-500/60 ring-1 ring-cyan-500/40' 
+                        : 'bg-slate-900/80 border-slate-800/80 hover:bg-slate-800/60'
+                }`;
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-2.5 truncate">
+                        <button onclick="replayCall('${call._id}')" class="w-7 h-7 rounded-lg ${isPlaying ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 hover:bg-cyan-600 text-slate-300 hover:text-white'} flex items-center justify-center shrink-0 transition-colors" title="Play Call">
+                            <i class="fa-solid ${isPlaying ? 'fa-volume-high animate-bounce' : 'fa-play text-[10px]'}"></i>
+                        </button>
+                        <div class="truncate">
+                            <div class="font-bold text-white truncate flex items-center gap-1.5">
+                                <span>${call.talkgroupName}</span>
+                                ${call.talkgroupNum ? `<span class="text-[9px] text-slate-400 font-normal">TG ${call.talkgroupNum}</span>` : ''}
+                            </div>
+                            <div class="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
+                                <span class="text-cyan-400">${call.formattedFreq}</span>
+                                <span>•</span>
+                                <span>${call.len || 4}s</span>
+                                <span>•</span>
+                                <span>${call.timeString}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="${call.url}" target="_blank" rel="noopener noreferrer" class="text-slate-500 hover:text-cyan-400 shrink-0 text-[10px]" title="Direct Audio URL">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a>
+                `;
+
+                container.appendChild(item);
+            });
+        }
+
+        function replayCall(callId) {
+            const target = allCapturedCalls.find(c => c._id === callId);
+            if (target) {
+                isListening = true;
+                playSpecificCall(target);
+            }
+        }
+
+        function clearCallsHistory() {
+            allCapturedCalls = [];
+            callQueue = [];
+            playedCallIds.clear();
+            renderCallList();
+        }
+
+        // Audio Spectrum Visualizer
+        function initVisualizer() {
+            const canvas = document.getElementById('audio-visualizer');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            function render() {
+                canvas.width = canvas.parentElement.clientWidth || 400;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                if (!isAudioPlayingCall || isMuted) {
+                    ctx.strokeStyle = currentChannel.band === '490' ? 'rgba(52, 211, 153, 0.25)' : 'rgba(56, 189, 248, 0.25)';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(0, canvas.height / 2);
+                    ctx.lineTo(canvas.width, canvas.height / 2);
+                    ctx.stroke();
+                } else {
+                    const bars = 48;
+                    const barWidth = canvas.width / bars;
+
+                    for (let i = 0; i < bars; i++) {
+                        const freqMag = (Math.sin(Date.now() * 0.009 + i * 0.35) * 0.5 + 0.5) * (canvas.height * 0.82);
+                        const is490 = (currentChannel.band === '490');
+                        ctx.fillStyle = is490 
+                            ? `rgba(52, 211, 153, ${0.35 + (freqMag / canvas.height) * 0.65})`
+                            : `rgba(56, 189, 248, ${0.35 + (freqMag / canvas.height) * 0.65})`;
+                        ctx.fillRect(i * barWidth, canvas.height - freqMag, barWidth - 1.5, freqMag);
+                    }
+                }
+
+                animFrameId = requestAnimationFrame(render);
+            }
+
+            render();
+        }
+
+        // Tower Directory Modal Logic
+        let activeModalTowerTab = 'all';
+
+        function openTowerListModal() {
+            document.getElementById('tower-list-modal').classList.remove('hidden');
+            renderTowerModalList();
+        }
+
+        function closeTowerListModal() {
+            document.getElementById('tower-list-modal').classList.add('hidden');
+        }
+
+        function filterTowerModalTab(tab) {
+            activeModalTowerTab = tab;
+            ['all', '774', '490'].forEach(t => {
+                const b = document.getElementById(`modal-tab-${t}`);
+                if (b) {
+                    if (t === tab) b.className = "px-2.5 py-1 rounded-lg bg-cyan-600 text-white font-bold text-[11px]";
+                    else b.className = "px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-bold text-[11px]";
+                }
+            });
+            renderTowerModalList();
+        }
+
+        function renderTowerModalList() {
+            const listEl = document.getElementById('tower-modal-list');
+            const searchInput = document.getElementById('tower-search-input');
+            if (!listEl) return;
+
+            const q = searchInput ? searchInput.value.toLowerCase() : '';
+            const allTowers = [
+                ...TOWER_774_SITES.map(t => ({ ...t, freqGroup: '774' })),
+                ...TOWER_490_SITES.map(t => ({ ...t, freqGroup: '490' }))
+            ];
+
+            const filtered = allTowers.filter(tw => {
+                const matchTab = (activeModalTowerTab === 'all' || tw.freqGroup === activeModalTowerTab);
+                const matchSearch = !q || (
+                    tw.name.toLowerCase().includes(q) ||
+                    tw.address.toLowerCase().includes(q) ||
+                    tw.type.toLowerCase().includes(q) ||
+                    tw.band.toLowerCase().includes(q)
+                );
+                return matchTab && matchSearch;
+            });
+
+            listEl.innerHTML = '';
+            filtered.forEach(tw => {
+                const card = document.createElement('div');
+                const is774 = (tw.freqGroup === '774');
+                card.className = "p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3";
+                card.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-xl ${is774 ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' : 'bg-purple-500/20 text-purple-400 border border-purple-500/30'} flex items-center justify-center font-bold text-xs">
+                            <i class="fa-solid fa-tower-cell"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <b class="text-white text-xs">${tw.name}</b>
+                                <span class="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold ${is774 ? 'bg-cyan-500/20 text-cyan-300' : 'bg-purple-500/20 text-purple-300'}">${tw.band}</span>
+                                <span class="text-[9px] text-slate-400">${tw.type}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-400 mt-0.5 truncate">${tw.address}</div>
+                        </div>
+                    </div>
+                    <div class="text-right font-mono text-[10px] shrink-0">
+                        <div class="text-slate-200">Height: <b>${tw.height || tw.towerHeight || 'N/A'}</b></div>
+                        <div class="text-emerald-400 font-bold">${tw.rssi ? `RSSI: ${tw.rssi}` : (tw.groundElev ? `Elev: ${tw.groundElev}` : '')}</div>
+                    </div>
+                `;
+                listEl.appendChild(card);
+            });
+        }
+
+        const towerSearchEl = document.getElementById('tower-search-input');
+        if (towerSearchEl) {
+            towerSearchEl.addEventListener('input', renderTowerModalList);
+        }
+    </script>
+</body>
+</html>
